@@ -1,0 +1,41 @@
+const db = require("../database/db");
+
+function create(accountData) {
+  const newAccount = {
+    id: db.accountIdCounter,
+    name: accountData.name,
+    balance: accountData.balance,
+    createdAt: accountData.createdAt
+  };
+
+  db.accounts.push(newAccount);
+  db.accountIdCounter++;
+
+  return newAccount;
+}
+
+function findAll() {
+  return db.accounts;
+}
+
+function findById(id) {
+  return db.accounts.find(acc => acc.id === id) || null;
+}
+
+function update(updatedAccount) {
+  const index = db.accounts.findIndex(acc => acc.id === updatedAccount.id);
+
+  if (index !== -1) {
+    db.accounts[index] = updatedAccount;
+  }
+
+  return updatedAccount;
+}
+
+
+module.exports = {
+  create,
+  findAll,
+  findById,
+  update,
+};

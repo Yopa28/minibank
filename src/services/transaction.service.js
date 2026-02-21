@@ -1,158 +1,239 @@
-const accountRepository = require("../repositories/account.repository");
-const transactionRepository = require("../repositories/transaction.repository");
-const { validateAmount } = require("../validations/transaction.validation");
-const { validateTransfer } = require("../validations/transaction.validation");
-const auditRepository = require("../repositories/audit.repository");
-
-
+const pool = require("../config/database");
 const AppError = require("../utils/AppError");
+const { validateAmount } = require("../validations/transaction.validation");
 
+/**
+ * Helper untuk menjalankan operasi dalam DB transaction
+ */
+async function runInTransaction(callback) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const result = await callback(connection);
+
+    await connection.commit();
+    return result;
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * DEPOSIT
+ */
 async function deposit(accountId, amount, performedBy) {
   validateAmount(amount);
 
-  const account = await accountRepository.findById(accountId);
+  return runInTransaction(async (conn) => {
 
-  if (!account) {
-    throw new AppError(404, "Account not found");
-  }
+    const [rows] = await conn.query(
+      "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
+      [accountId]
+    );
 
-  if (account.isFrozen) {
-    throw new AppError(403, "Account is frozen");
-  }
-
-  account.balance += amount;
-
-  await accountRepository.update(account);
-
-  await transactionRepository.create({
-    accountId: account.id,
-    type: "deposit",
-    amount,
-    createdAt: new Date()
-  });
-
-  await auditRepository.create({
-    action: "DEPOSIT",
-    entity: "Account",
-    entityId: account.id,
-    performedBy,
-    description: `Deposit ${amount} to account ${account.id}`,
-    createdAt: new Date()
-  });
-
-  return account;
-}
-
-async function withdraw (accountId, amount, performedBy) {
-  validateAmount(amount);
-  
-  const account = await accountRepository.findById(accountId);
+    const account = rows[0];
 
     if (!account) {
-    throw new AppError(404, "Account not found");
-  }
+      throw new AppError(404, "Account not found");
+    }
 
     if (account.isFrozen) {
-    throw new AppError(403, "Account is frozen");
-  }
+      throw new AppError(403, "Account is frozen");
+    }
 
-  if (account.balance < amount){
-    throw new AppError ( 409, "Insufficient balance");
-  }
+    // Update balance
+    await conn.query(
+      "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+      [amount, accountId]
+    );
 
-  account.balance -= amount;
+    // Insert transaction record
+    await conn.query(
+      `
+      INSERT INTO transactions (accountId, type, amount, referenceId)
+      VALUES (?, 'deposit', ?, NULL)
+      `,
+      [accountId, amount]
+    );
 
-  accountRepository.update(account);
+    // Insert audit log
+    await conn.query(
+      `
+      INSERT INTO audit_logs (action, entity, entityId, performedBy, description)
+      VALUES ('DEPOSIT', 'Account', ?, ?, ?)
+      `,
+      [accountId, performedBy, `Deposit ${amount} to account ${accountId}`]
+    );
 
-  transactionRepository.create({
-    accountId: account.id,
-    type : "withdraw",
-    amount, 
-    createdAt: new Date () 
-   });
-
-   auditRepository.create({
-    action: "WITHDRAW",
-    entity: "Account",
-    entityId: account.id, performedBy,
-    description: `Withdraw ${amount} from account ${account.id}`,
+    return {
+      ...account,
+      balance: Number(account.balance) + Number(amount)
+    };
   });
-
-   return account;
 }
 
+/**
+ * WITHDRAW
+ */
+async function withdraw(accountId, amount, performedBy) {
+  validateAmount(amount);
 
+  return runInTransaction(async (conn) => {
+
+    const [rows] = await conn.query(
+      "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
+      [accountId]
+    );
+
+    const account = rows[0];
+
+    if (!account) {
+      throw new AppError(404, "Account not found");
+    }
+
+    if (account.isFrozen) {
+      throw new AppError(403, "Account is frozen");
+    }
+
+    if (Number(account.balance) < Number(amount)) {
+      throw new AppError(409, "Insufficient balance");
+    }
+
+    // Update balance
+    await conn.query(
+      "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+      [amount, accountId]
+    );
+
+    // Insert transaction record
+    await conn.query(
+      `
+      INSERT INTO transactions (accountId, type, amount, referenceId)
+      VALUES (?, 'withdraw', ?, NULL)
+      `,
+      [accountId, amount]
+    );
+
+    // Insert audit log
+    await conn.query(
+      `
+      INSERT INTO audit_logs (action, entity, entityId, performedBy, description)
+      VALUES ('WITHDRAW', 'Account', ?, ?, ?)
+      `,
+      [accountId, performedBy, `Withdraw ${amount} from account ${accountId}`]
+    );
+
+    return {
+      ...account,
+      balance: Number(account.balance) - Number(amount)
+    };
+  });
+}
+
+/**
+ * TRANSFER
+ */
 async function transfer(fromId, toId, amount, performedBy) {
-  validateTransfer(fromId, toId, amount, performedBy);
+  validateAmount(amount);
 
-  const sender = await accountRepository.findById(fromId);
-  const receiver = await accountRepository.findById(toId);
-
-  if (!sender || !receiver) {
-    throw new AppError  ( 404,  "Account not found" );
+  if (fromId === toId) {
+    throw new AppError(400, "Cannot transfer to the same account");
   }
 
-  if (sender.isFrozen) {
-    throw new AppError ( 403,  "Sender account is frozen" );
-  }
+  return runInTransaction(async (conn) => {
 
-  if (receiver.isFrozen) {
-    throw new AppError ( 403,  "Receiver account is frozen" );
-  }
+    // Lock sender
+    const [senderRows] = await conn.query(
+      "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
+      [fromId]
+    );
 
-  if (sender.balance < amount) {
-    throw new AppError ( 409,  "Insufficient balance" );
-  }
+    const sender = senderRows[0];
 
-  // Update balances
-  sender.balance -= amount;
-  receiver.balance += amount;
+    if (!sender) {
+      throw new AppError(404, "Sender account not found");
+    }
 
-  accountRepository.update(sender);
-  accountRepository.update(receiver);
+    if (sender.isFrozen) {
+      throw new AppError(403, "Sender account is frozen");
+    }
 
-  // Record transactions (keluar)
-  transactionRepository.create({
-    accountId: sender.id,
-    type: "transfer_out",
-    amount,
-    referenceId: receiver.id,
-    createdAt: new Date()
+    if (Number(sender.balance) < Number(amount)) {
+      throw new AppError(409, "Insufficient balance");
+    }
+
+    // Lock receiver
+    const [receiverRows] = await conn.query(
+      "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
+      [toId]
+    );
+
+    const receiver = receiverRows[0];
+
+    if (!receiver) {
+      throw new AppError(404, "Receiver account not found");
+    }
+
+    // Update balances
+    await conn.query(
+      "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+      [amount, fromId]
+    );
+
+    await conn.query(
+      "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+      [amount, toId]
+    );
+
+    // Insert transaction records
+    await conn.query(
+      `
+      INSERT INTO transactions (accountId, type, amount, referenceId)
+      VALUES (?, 'transfer', ?, ?)
+      `,
+      [fromId, amount, toId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO transactions (accountId, type, amount, referenceId)
+      VALUES (?, 'transfer', ?, ?)
+      `,
+      [toId, amount, fromId]
+    );
+
+    // Insert audit log
+    await conn.query(
+      `
+      INSERT INTO audit_logs (action, entity, entityId, performedBy, description)
+      VALUES ('TRANSFER', 'Account', ?, ?, ?)
+      `,
+      [fromId, performedBy, `Transfer ${amount} from ${fromId} to ${toId}`]
+    );
+
+    return { message: "Transfer successful" };
   });
-
-  // Record transactions (masuk)
-  transactionRepository.create({
-    accountId: receiver.id,
-    type: "transfer_in",
-    amount,
-    referenceId: sender.id,
-    createdAt: new Date()
-  });
-
-  auditRepository.create({
-    action: "TRANSFER",
-    entity: "Account",
-    entityId: sender.id,performedBy,
-    description: `Transfer ${amount} from ${sender.id} to ${receiver.id}`,
-  });
-
-  return { message: "Transfer successful" };
 }
 
-
+/**
+ * GET TRANSACTIONS BY ACCOUNT
+ */
 
 async function getTransactionsByAccount(accountId) {
-  const account = await accountRepository.findById(accountId);
+  const [rows] = await pool.query(
+    "SELECT * FROM transactions WHERE accountId = ? ORDER BY createdAt DESC",
+    [accountId]
+  );
 
-  if (!account) {
-    throw { statusCode: 404, message: "Account not found" };
-  }
-
-  return transactionRepository.findByAccountId(accountId);
+  return rows;
 }
-
-
-
 
 module.exports = {
   deposit,
@@ -160,4 +241,3 @@ module.exports = {
   transfer,
   getTransactionsByAccount
 };
-

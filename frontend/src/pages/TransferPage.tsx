@@ -8,22 +8,26 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { FormInput } from '../components/FormInput';
-import { accountService, transactionService } from '../services/api';
+import { accountService, transactionService, type Account } from '../services/api';
+
 import { useAuth } from '../context/AuthContext';
 import { NotificationToast } from '../components/NotificationToast';
 
 const TransferPage: React.FC = () => {
-    const [accounts, setAccounts] = useState([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+
     const [formData, setFormData] = useState({
-        fromId: '',
-        toId: '',
+        fromAccountId: '',
+        toAccountId: '',
         amount: '',
     });
+
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    const { userId } = useAuth();
+    const { } = useAuth(); // role/userId not used here as it's passed in headers
+
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -48,26 +52,27 @@ const TransferPage: React.FC = () => {
 
     const handleTransfer = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.fromId || !formData.toId || !formData.amount) {
+        if (!formData.fromAccountId || !formData.toAccountId || !formData.amount) {
             setNotification({ message: "Please fill all fields", type: "error" });
             return;
         }
 
-        if (formData.fromId === formData.toId) {
+        if (formData.fromAccountId === formData.toAccountId) {
             setNotification({ message: "Source and destination accounts must be different", type: "error" });
             return;
         }
 
+
         try {
             setSubmitting(true);
             await transactionService.transfer({
-                fromId: parseInt(formData.fromId),
-                toId: parseInt(formData.toId),
+                fromAccountId: parseInt(formData.fromAccountId),
+                toAccountId: parseInt(formData.toAccountId),
                 amount: parseFloat(formData.amount),
-                performedBy: userId
             });
             setNotification({ message: "Transfer completed successfully!", type: "success" });
-            setFormData({ fromId: '', toId: '', amount: '' });
+            setFormData({ fromAccountId: '', toAccountId: '', amount: '' });
+
             // Redirect after a short delay
             setTimeout(() => navigate('/accounts'), 2000);
         } catch (error: any) {
@@ -78,12 +83,13 @@ const TransferPage: React.FC = () => {
         }
     };
 
-    const accountOptions = accounts.map((acc: any) => ({
+    const accountOptions = accounts.map((acc) => ({
         value: acc.id,
         label: `${acc.name} (#${acc.id}) - $${acc.balance.toLocaleString()}${acc.isFrozen ? ' (Frozen)' : ''}`
     }));
 
-    const selectedFromAccount = accounts.find((acc: any) => acc.id.toString() === formData.fromId);
+    const selectedFromAccount = accounts.find((acc) => acc.id.toString() === formData.fromAccountId);
+
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -99,24 +105,25 @@ const TransferPage: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormInput
                                     label="From Account"
-                                    name="fromId"
+                                    name="fromAccountId"
                                     type="select"
                                     options={accountOptions}
-                                    value={formData.fromId}
+                                    value={formData.fromAccountId}
                                     onChange={handleChange}
                                     disabled={submitting}
                                     required
                                 />
                                 <FormInput
                                     label="To Account"
-                                    name="toId"
+                                    name="toAccountId"
                                     type="select"
                                     options={accountOptions}
-                                    value={formData.toId}
+                                    value={formData.toAccountId}
                                     onChange={handleChange}
                                     disabled={submitting}
                                     required
                                 />
+
                             </div>
 
                             <div className="relative">

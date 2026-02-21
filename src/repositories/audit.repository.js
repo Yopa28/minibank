@@ -1,24 +1,32 @@
-const db = require("../database/db");
+const pool = require("../config/database");
 
-function create(auditData) {
-  const newLog = {
-    id: db.auditLogIdCounter,
-    action: auditData.action,
-    entity: auditData.entity,
-    entityId: auditData.entityId,
-    performedBy: auditData.performedBy,
-    description: auditData.description,
-    createdAt: new Date()
+async function create(auditData) {
+  const { action, entity, entityId, performedBy, description } = auditData;
+
+  const [result] = await pool.query(
+    `
+    INSERT INTO audit_logs (action, entity, entityId, performedBy, description)
+    VALUES (?, ?, ?, ?, ?)
+    `,
+    [action, entity, entityId, performedBy, description]
+  );
+
+  return {
+    id: result.insertId,
+    action,
+    entity,
+    entityId,
+    performedBy,
+    description
   };
-
-  db.auditLogs.push(newLog);
-  db.auditLogIdCounter++;
-
-  return newLog;
 }
 
-function findAll() {
-  return db.auditLogs;
+async function findAll() {
+  const [rows] = await pool.query(
+    "SELECT * FROM audit_logs ORDER BY createdAt DESC"
+  );
+
+  return rows;
 }
 
 module.exports = {

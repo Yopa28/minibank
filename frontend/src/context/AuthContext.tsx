@@ -10,11 +10,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [userId, setUserId] = useState<string>(localStorage.getItem('userId') || 'admin');
+    const [userId, setUserId] = useState<string>(localStorage.getItem('user') || 'admin');
     const [role, setRole] = useState<'admin' | 'user'>(userId === 'admin' ? 'admin' : 'user');
 
     useEffect(() => {
-        localStorage.setItem('userId', userId);
+        localStorage.setItem('user', userId);
+
         setRole(userId === 'admin' ? 'admin' : 'user');
     }, [userId]);
 

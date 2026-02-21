@@ -10,10 +10,12 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
-import { auditService } from '../services/api';
+import { auditService, type AuditLog } from '../services/api';
+import type { Column } from '../components/DataTable';
 
 const AuditLogsPage: React.FC = () => {
-    const [logs, setLogs] = useState([]);
+    const [logs, setLogs] = useState<AuditLog[]>([]);
+
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [actionFilter, setActionFilter] = useState('all');
@@ -42,10 +44,10 @@ const AuditLogsPage: React.FC = () => {
         return matchesSearch && matchesAction;
     });
 
-    const columns = [
+    const columns: Column<AuditLog>[] = [
         {
             header: 'Action',
-            accessor: (log: any) => (
+            accessor: (log) => (
                 <span className={clsx(
                     "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide",
                     log.action === 'TRANSFER' ? "bg-blue-100 text-blue-700" :
@@ -58,17 +60,8 @@ const AuditLogsPage: React.FC = () => {
             )
         },
         {
-            header: 'Entity',
-            accessor: (log: any) => (
-                <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-900">{log.entity}</span>
-                    <span className="text-xs text-slate-400 font-mono">ID: {log.entityId || 'N/A'}</span>
-                </div>
-            )
-        },
-        {
             header: 'Performed By',
-            accessor: (log: any) => (
+            accessor: (log) => (
                 <div className="flex items-center">
                     <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mr-2">
                         <User className="w-3 h-3" />
@@ -84,7 +77,7 @@ const AuditLogsPage: React.FC = () => {
         },
         {
             header: 'Timestamp',
-            accessor: (log: any) => (
+            accessor: (log) => (
                 <div className="flex items-center text-xs text-slate-400">
                     <Clock className="w-3 h-3 mr-1.5" />
                     {new Date(log.createdAt).toLocaleString()}
@@ -92,6 +85,7 @@ const AuditLogsPage: React.FC = () => {
             )
         },
     ];
+
 
     const actions = Array.from(new Set(logs.map((log: any) => log.action)));
 

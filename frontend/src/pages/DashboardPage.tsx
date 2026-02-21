@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { StatCard, Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
-import { accountService, auditService } from '../services/api';
+import { accountService, auditService, type Account, type AuditLog } from '../services/api';
 import {
     AreaChart,
     Area,
@@ -19,6 +19,7 @@ import {
     Tooltip,
     ResponsiveContainer
 } from 'recharts';
+import type { Column } from '../components/DataTable';
 
 const chartData = [
     { name: 'Mon', transactions: 4000 },
@@ -37,7 +38,7 @@ const DashboardPage: React.FC = () => {
         frozenAccounts: 0,
         totalLogs: 0
     });
-    const [recentLogs, setRecentLogs] = useState([]);
+    const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -53,12 +54,13 @@ const DashboardPage: React.FC = () => {
 
                 setStats({
                     totalAccounts: accounts.length,
-                    totalBalance: accounts.reduce((acc: number, curr: any) => acc + curr.balance, 0),
-                    frozenAccounts: accounts.filter((acc: any) => acc.isFrozen).length,
+                    totalBalance: accounts.reduce((acc: number, curr: Account) => acc + curr.balance, 0),
+                    frozenAccounts: accounts.filter((acc: Account) => acc.isFrozen).length,
                     totalLogs: logs.length
                 });
 
                 setRecentLogs(logs.slice(-5).reverse());
+
             } catch (error) {
                 console.error("Failed to fetch dashboard data", error);
             } finally {
@@ -69,10 +71,10 @@ const DashboardPage: React.FC = () => {
         fetchData();
     }, []);
 
-    const columns = [
+    const columns: Column<AuditLog>[] = [
         {
             header: 'Action',
-            accessor: (log: any) => (
+            accessor: (log) => (
                 <span className={clsx(
                     "px-2 py-1 rounded-full text-[10px] font-bold uppercase",
                     log.action === 'TRANSFER' ? "bg-blue-100 text-blue-700" :
@@ -87,9 +89,10 @@ const DashboardPage: React.FC = () => {
         { header: 'Description', accessor: 'description', className: 'max-w-xs truncate' },
         {
             header: 'Time',
-            accessor: (log: any) => new Date(log.createdAt).toLocaleTimeString()
+            accessor: (log) => new Date(log.createdAt).toLocaleTimeString()
         },
     ];
+
 
     return (
         <div className="space-y-8">

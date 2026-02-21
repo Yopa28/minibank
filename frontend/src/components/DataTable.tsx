@@ -6,7 +6,7 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-interface Column<T> {
+export interface Column<T> {
     header: string;
     accessor: keyof T | ((item: T) => React.ReactNode);
     className?: string;

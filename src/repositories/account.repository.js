@@ -1,42 +1,58 @@
-const db = require("../database/db");
+const pool = require("../config/database");
 
 async function create(accountData) {
-  const newAccount = {
-    id: db.accountIdCounter,
-    name: accountData.name,
-    balance: accountData.balance,
-    isFrozen: false,
-    createdAt: accountData.createdAt
+  const { name, balance, isFrozen, createdAt } = accountData;
+
+  const [result] = await pool.query(
+    `
+    INSERT INTO accounts (name, balance, isFrozen, createdAt)
+    VALUES (?, ?, ?, ?)
+    `,
+    [name, balance, isFrozen, createdAt]
+  );
+
+  return {
+    id: result.insertId,
+    name,
+    balance,
+    isFrozen,
+    createdAt
   };
-
-  db.accounts.push(newAccount);
-  db.accountIdCounter++;
-
-  return newAccount;
-}
-
-async function findAll() {
-  return db.accounts;
 }
 
 async function findById(id) {
-  return db.accounts.find(acc => acc.id === id) || null;
+  const [rows] = await pool.query(
+    "SELECT * FROM accounts WHERE id = ?",
+    [id]
+  );
+
+  return rows[0] || null;
 }
 
-async function update(updatedAccount) {
-  const index = db.accounts.findIndex(acc => acc.id === updatedAccount.id);
+async function findAll() {
+  const [rows] = await pool.query(
+    "SELECT * FROM accounts"
+  );
 
-  if (index !== -1) {
-    db.accounts[index] = updatedAccount;
-  }
-
-  return updatedAccount;
+  return rows;
 }
 
+async function update(account) {
+  await pool.query(
+    `
+    UPDATE accounts
+    SET name = ?, balance = ?, isFrozen = ?
+    WHERE id = ?
+    `,
+    [account.name, account.balance, account.isFrozen, account.id]
+  );
+
+  return account;
+}
 
 module.exports = {
   create,
-  findAll,
   findById,
-  update,
+  findAll,
+  update
 };

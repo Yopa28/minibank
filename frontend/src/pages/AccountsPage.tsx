@@ -11,12 +11,13 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
-import { accountService } from '../services/api';
+import { accountService, type Account } from '../services/api';
+import type { Column } from '../components/DataTable';
 import { useAuth } from '../context/AuthContext';
 import { NotificationToast } from '../components/NotificationToast';
 
 const AccountsPage: React.FC = () => {
-    const [accounts, setAccounts] = useState([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -30,6 +31,7 @@ const AccountsPage: React.FC = () => {
             setLoading(true);
             const res = await accountService.getAll();
             setAccounts(res.data);
+
         } catch (error) {
             setNotification({ message: "Failed to load accounts", type: "error" });
         } finally {
@@ -66,11 +68,11 @@ const AccountsPage: React.FC = () => {
         return matchesSearch && matchesStatus;
     });
 
-    const columns = [
+    const columns: Column<Account>[] = [
         { header: 'ID', accessor: 'id', className: 'font-mono text-xs w-16' },
         {
             header: 'Account Holder',
-            accessor: (acc: any) => (
+            accessor: (acc) => (
                 <div className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs mr-3">
                         {acc.name.charAt(0).toUpperCase()}
@@ -81,13 +83,13 @@ const AccountsPage: React.FC = () => {
         },
         {
             header: 'Balance',
-            accessor: (acc: any) => (
+            accessor: (acc) => (
                 <span className="font-semibold text-slate-900">${acc.balance.toLocaleString()}</span>
             )
         },
         {
             header: 'Status',
-            accessor: (acc: any) => (
+            accessor: (acc) => (
                 <span className={clsx(
                     "px-2.5 py-0.5 rounded-full text-xs font-semibold",
                     acc.isFrozen ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
@@ -98,11 +100,11 @@ const AccountsPage: React.FC = () => {
         },
         {
             header: 'Created Date',
-            accessor: (acc: any) => new Date(acc.createdAt).toLocaleDateString()
+            accessor: (acc) => new Date(acc.createdAt).toLocaleDateString()
         },
         {
             header: 'Actions',
-            accessor: (acc: any) => (
+            accessor: (acc) => (
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={() => navigate(`/accounts/${acc.id}`)}
@@ -129,6 +131,7 @@ const AccountsPage: React.FC = () => {
             )
         }
     ];
+
 
     return (
         <div className="space-y-6">

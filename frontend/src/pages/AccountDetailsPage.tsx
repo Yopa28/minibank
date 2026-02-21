@@ -12,7 +12,10 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
-import { accountService } from '../services/api';
+import { accountService, type Account, type Transaction } from '../services/api';
+import type { Column } from '../components/DataTable';
+import { FormInput } from '../components/FormInput';
+
 import { useAuth } from '../context/AuthContext';
 import { NotificationToast } from '../components/NotificationToast';
 
@@ -21,10 +24,15 @@ const AccountDetailsPage: React.FC = () => {
     const navigate = useNavigate();
     const { role } = useAuth();
 
-    const [account, setAccount] = useState<any>(null);
-    const [transactions, setTransactions] = useState([]);
+    const [account, setAccount] = useState<Account | null>(null);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [showDepositModal, setShowDepositModal] = useState(false);
+    const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+    const [amount, setAmount] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
 
     const fetchData = async () => {
         if (!id) return;
@@ -63,10 +71,34 @@ const AccountDetailsPage: React.FC = () => {
         }
     };
 
-    const columns = [
+    const handleAction = async (type: 'deposit' | 'withdraw') => {
+
+        if (!account || !amount || isNaN(parseFloat(amount))) return;
+        try {
+            setSubmitting(true);
+            if (type === 'deposit') {
+                await accountService.deposit(account.id, parseFloat(amount));
+                setNotification({ message: "Deposit successful", type: "success" });
+            } else {
+                await accountService.withdraw(account.id, parseFloat(amount));
+                setNotification({ message: "Withdrawal successful", type: "success" });
+            }
+            setAmount('');
+            setShowDepositModal(false);
+            setShowWithdrawModal(false);
+            fetchData();
+        } catch (error: any) {
+            setNotification({ message: error.response?.data?.message || "Action failed", type: "error" });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+
+    const columns: Column<Transaction>[] = [
         {
             header: 'Type',
-            accessor: (tx: any) => (
+            accessor: (tx) => (
                 <div className="flex items-center">
                     {tx.type === 'deposit' || tx.type === 'transfer_in' ? (
                         <TrendingUp className="w-4 h-4 text-green-500 mr-2" />
@@ -79,7 +111,7 @@ const AccountDetailsPage: React.FC = () => {
         },
         {
             header: 'Amount',
-            accessor: (tx: any) => (
+            accessor: (tx) => (
                 <span className={clsx(
                     "font-bold",
                     tx.type === 'deposit' || tx.type === 'transfer_in' ? "text-green-600" : "text-red-600"
@@ -91,13 +123,14 @@ const AccountDetailsPage: React.FC = () => {
         },
         {
             header: 'Reference/ID',
-            accessor: (tx: any) => tx.referenceId ? `#${tx.referenceId}` : '-'
+            accessor: (tx) => tx.referenceId ? `#${tx.referenceId}` : '-'
         },
         {
             header: 'Date & Time',
-            accessor: (tx: any) => new Date(tx.createdAt).toLocaleString()
+            accessor: (tx) => new Date(tx.createdAt).toLocaleString()
         },
     ];
+
 
     if (loading && !account) {
         return <div className="text-center py-12">Loading...</div>;
@@ -125,20 +158,35 @@ const AccountDetailsPage: React.FC = () => {
                     Back to Accounts
                 </button>
                 {role === 'admin' && (
-                    <button
-                        onClick={handleToggleFreeze}
-                        className={clsx(
-                            "btn",
-                            account.isFrozen ? "btn-secondary border-amber-300 text-amber-700" : "btn-danger"
-                        )}
-                    >
-                        {account.isFrozen ? (
-                            <><Sun className="w-4 h-4 mr-2" /> Unfreeze Account</>
-                        ) : (
-                            <><Snowflake className="w-4 h-4 mr-2" /> Freeze Account</>
-                        )}
-                    </button>
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => setShowDepositModal(true)}
+                            className="btn btn-secondary text-green-700 border-green-200 hover:bg-green-50"
+                        >
+                            Deposit
+                        </button>
+                        <button
+                            onClick={() => setShowWithdrawModal(true)}
+                            className="btn btn-secondary text-red-700 border-red-200 hover:bg-red-50"
+                        >
+                            Withdraw
+                        </button>
+                        <button
+                            onClick={handleToggleFreeze}
+                            className={clsx(
+                                "btn",
+                                account.isFrozen ? "btn-secondary border-amber-300 text-amber-700" : "btn-danger"
+                            )}
+                        >
+                            {account.isFrozen ? (
+                                <><Sun className="w-4 h-4 mr-2" /> Unfreeze Account</>
+                            ) : (
+                                <><Snowflake className="w-4 h-4 mr-2" /> Freeze Account</>
+                            )}
+                        </button>
+                    </div>
                 )}
+
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -190,7 +238,45 @@ const AccountDetailsPage: React.FC = () => {
                     onClose={() => setNotification(null)}
                 />
             )}
+
+            {/* Deposit/Withdraw Modals */}
+            {(showDepositModal || showWithdrawModal) && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <Card className="w-full max-w-md shadow-2xl" title={showDepositModal ? "Deposit Funds" : "Withdraw Funds"}>
+                        <div className="space-y-4">
+                            <FormInput
+                                label="Amount (USD)"
+                                type="number"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder="0.00"
+                                autoFocus
+                            />
+                            <div className="flex space-x-3 pt-2">
+                                <button
+                                    className="flex-1 btn btn-secondary"
+                                    onClick={() => {
+                                        setShowDepositModal(false);
+                                        setShowWithdrawModal(false);
+                                        setAmount('');
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className="flex-1 btn btn-primary"
+                                    onClick={() => handleAction(showDepositModal ? 'deposit' : 'withdraw')}
+                                    disabled={submitting || !amount}
+                                >
+                                    {submitting ? "Processing..." : "Confirm"}
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
         </div>
+
     );
 };
 

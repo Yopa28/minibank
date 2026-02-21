@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const accountRoutes = require("./routes/account.routes");
 const errorHandler = require("./middlewares/error.middleware");
 const transactionRoutes = require("./routes/transaction.routes");
@@ -9,21 +10,21 @@ const logger = require("./middlewares/logger.middleware");
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 app.use(authMiddleware);
 
-app.use(rateLimit({ windowMs: 60000, max: 10 }));
+app.use(rateLimit({ windowMs: 60000, max: 1000 }));
+
 
 app.use(logger);
 
 app.use(accountRoutes);
-
 app.use(transactionRoutes);
+app.use(auditRoutes);
 
 app.use(errorHandler);
-
-app.use(auditRoutes);
 
 const PORT = 3000;
 

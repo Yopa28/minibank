@@ -2,42 +2,62 @@ const accountRepository = require("../repositories/account.repository");
 const transactionRepository = require("../repositories/transaction.repository");
 const { validateAmount } = require("../validations/transaction.validation");
 const { validateTransfer } = require("../validations/transaction.validation");
+const auditRepository = require("../repositories/audit.repository");
 
-function deposit(accountId, amount) {
+
+const AppError = require("../utils/AppError");
+
+async function deposit(accountId, amount, performedBy) {
   validateAmount(amount);
 
-  const account = accountRepository.findById(accountId);
+  const account = await accountRepository.findById(accountId);
 
   if (!account) {
-    throw { statusCode: 404, message: "Account not found" };
+    throw new AppError(404, "Account not found");
+  }
+
+  if (account.isFrozen) {
+    throw new AppError(403, "Account is frozen");
   }
 
   account.balance += amount;
 
-  accountRepository.update(account);
+  await accountRepository.update(account);
 
-  transactionRepository.create({
+  await transactionRepository.create({
     accountId: account.id,
     type: "deposit",
     amount,
     createdAt: new Date()
   });
 
+  await auditRepository.create({
+    action: "DEPOSIT",
+    entity: "Account",
+    entityId: account.id,
+    performedBy,
+    description: `Deposit ${amount} to account ${account.id}`,
+    createdAt: new Date()
+  });
+
   return account;
 }
 
-
-function withdraw (accountId, amount) {
+async function withdraw (accountId, amount, performedBy) {
   validateAmount(amount);
   
-  const account = accountRepository.findById(accountId);
+  const account = await accountRepository.findById(accountId);
 
-  if (!account){
-    throw {statusCode: 404, message: "Account not found"};
+    if (!account) {
+    throw new AppError(404, "Account not found");
+  }
+
+    if (account.isFrozen) {
+    throw new AppError(403, "Account is frozen");
   }
 
   if (account.balance < amount){
-    throw {statusCode: 409, message: "Insufficient balance"};
+    throw new AppError ( 409, "Insufficient balance");
   }
 
   account.balance -= amount;
@@ -50,22 +70,38 @@ function withdraw (accountId, amount) {
     amount, 
     createdAt: new Date () 
    });
+
+   auditRepository.create({
+    action: "WITHDRAW",
+    entity: "Account",
+    entityId: account.id, performedBy,
+    description: `Withdraw ${amount} from account ${account.id}`,
+  });
+
    return account;
 }
 
 
-function transfer(fromId, toId, amount) {
-  validateTransfer(fromId, toId, amount);
+async function transfer(fromId, toId, amount, performedBy) {
+  validateTransfer(fromId, toId, amount, performedBy);
 
-  const sender = accountRepository.findById(fromId);
-  const receiver = accountRepository.findById(toId);
+  const sender = await accountRepository.findById(fromId);
+  const receiver = await accountRepository.findById(toId);
 
   if (!sender || !receiver) {
-    throw { statusCode: 404, message: "Account not found" };
+    throw new AppError  ( 404,  "Account not found" );
+  }
+
+  if (sender.isFrozen) {
+    throw new AppError ( 403,  "Sender account is frozen" );
+  }
+
+  if (receiver.isFrozen) {
+    throw new AppError ( 403,  "Receiver account is frozen" );
   }
 
   if (sender.balance < amount) {
-    throw { statusCode: 409, message: "Insufficient balance" };
+    throw new AppError ( 409,  "Insufficient balance" );
   }
 
   // Update balances
@@ -75,28 +111,38 @@ function transfer(fromId, toId, amount) {
   accountRepository.update(sender);
   accountRepository.update(receiver);
 
-  // Record transactions
+  // Record transactions (keluar)
   transactionRepository.create({
     accountId: sender.id,
-    type: "transfer",
+    type: "transfer_out",
     amount,
     referenceId: receiver.id,
     createdAt: new Date()
   });
 
+  // Record transactions (masuk)
   transactionRepository.create({
     accountId: receiver.id,
-    type: "transfer",
+    type: "transfer_in",
     amount,
     referenceId: sender.id,
     createdAt: new Date()
   });
 
+  auditRepository.create({
+    action: "TRANSFER",
+    entity: "Account",
+    entityId: sender.id,performedBy,
+    description: `Transfer ${amount} from ${sender.id} to ${receiver.id}`,
+  });
+
   return { message: "Transfer successful" };
 }
 
-function getTranscationsByAccount(accountId) {
-  const account = accountRepository.findById(accountId);
+
+
+async function getTransactionsByAccount(accountId) {
+  const account = await accountRepository.findById(accountId);
 
   if (!account) {
     throw { statusCode: 404, message: "Account not found" };
@@ -112,6 +158,6 @@ module.exports = {
   deposit,
   withdraw,
   transfer,
-  getTranscationsByAccount
+  getTransactionsByAccount
 };
 

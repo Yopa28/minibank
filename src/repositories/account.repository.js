@@ -1,10 +1,11 @@
 const db = require("../database/db");
 
-function create(accountData) {
+async function create(accountData) {
   const newAccount = {
     id: db.accountIdCounter,
     name: accountData.name,
     balance: accountData.balance,
+    isFrozen: false,
     createdAt: accountData.createdAt
   };
 
@@ -14,15 +15,15 @@ function create(accountData) {
   return newAccount;
 }
 
-function findAll() {
+async function findAll() {
   return db.accounts;
 }
 
-function findById(id) {
+async function findById(id) {
   return db.accounts.find(acc => acc.id === id) || null;
 }
 
-function update(updatedAccount) {
+async function update(updatedAccount) {
   const index = db.accounts.findIndex(acc => acc.id === updatedAccount.id);
 
   if (index !== -1) {

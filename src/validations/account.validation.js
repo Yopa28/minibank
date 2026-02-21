@@ -1,4 +1,4 @@
-function validateCreateAccount(name) {
+async function validateCreateAccount(name) {
   if (!name) {
     throw { statusCode: 400, message: "Name is required" };
   }

@@ -3,8 +3,12 @@ const accountService = require("../services/account.service");
 async function createAccount(req, res, next) {
   try {
     const { name } = req.body;
+    const performedBy = req.user.id;
 
-    const account = accountService.createAccount(name);
+    const account = await accountService.createAccount(
+      name,
+      performedBy
+    );
 
     res.status(201).json(account);
   } catch (error) {
@@ -12,23 +16,62 @@ async function createAccount(req, res, next) {
   }
 }
 
-async function getAccountById (req, res, next){
+async function getAccountById(req, res, next) {
   try {
-    const id = Number (req.params.id);
+    const id = Number(req.params.id);
 
-    const account = accountService.getAccountById(id);
+    const account = await accountService.getAccountById(id);
 
-    res.status (200).json (account);
-  } catch (error){
-    next (error);
+    res.status(200).json(account);
+  } catch (error) {
+    next(error);
   }
 }
 
-async function getAllAccounts (req, res, next) {
+async function getAllAccounts(req, res, next) {
   try {
-    const accounts = accountService.getAllAccounts();
-    res.status (200).json(accounts);
-  } catch (error){
+    const accounts = await accountService.getAllAccounts();
+
+    res.status(200).json(accounts);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function freezeAccount(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const performedBy = req.user.id;
+
+    const account = await accountService.freezeAccount(
+      id,
+      performedBy
+    );
+
+    res.status(200).json({
+      message: "Account frozen",
+      account
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function unfreezeAccount(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const performedBy = req.user.id;
+
+    const account = await accountService.unfreezeAccount(
+      id,
+      performedBy
+    );
+
+    res.status(200).json({
+      message: "Account unfrozen",
+      account
+    });
+  } catch (error) {
     next(error);
   }
 }
@@ -36,5 +79,7 @@ async function getAllAccounts (req, res, next) {
 module.exports = {
   createAccount,
   getAccountById,
-  getAllAccounts
+  getAllAccounts,
+  freezeAccount,
+  unfreezeAccount
 };

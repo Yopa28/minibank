@@ -1,4 +1,4 @@
-function validateAmount(amount) {
+async function validateAmount(amount) {
   if (amount === undefined) {
     throw { statusCode: 400, message: "Amount is required" };
   }
@@ -12,7 +12,7 @@ function validateAmount(amount) {
   }
 }
 
-function validateTransfer (fromAccountId, toAccountId, amount){
+async function validateTransfer (fromAccountId, toAccountId, amount){
     if (!fromAccountId || ! toAccountId){
         throw {statusCode: 400, message: " Both account IDs are required"};
     }

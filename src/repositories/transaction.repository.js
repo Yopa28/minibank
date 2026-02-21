@@ -1,6 +1,6 @@
 const db = require("../database/db");
 
-function create(transactionData) {
+async function create(transactionData) {
   const newTransaction = {
     id: db.transactionIdCounter,
     accountId: transactionData.accountId,
@@ -16,7 +16,7 @@ function create(transactionData) {
   return newTransaction;
 }
 
-function findByAccountId(accountId){
+async function findByAccountId(accountId){
     return db.transactions.filter(
         tx => tx.accountId === accountId
     );

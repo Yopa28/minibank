@@ -2,7 +2,9 @@ const db = {
   accounts: [],
   accountIdCounter: 1,
   transactions : [],
-  transactionIdCounter :1
+  transactionIdCounter :1,
+  auditLogs : [],
+  auditLogIdCounter : 1
 };
 
 module.exports = db;

@@ -20,14 +20,14 @@ app.use(logger);
 app.use(rateLimit({ windowMs: 60000, max: 1000 }));
 
 // 
-app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 
 // 
 app.use(authMiddleware);
 
-app.use(accountRoutes);
-app.use(transactionRoutes);
-app.use(auditRoutes);
+app.use("/api", accountRoutes);
+app.use("/api", transactionRoutes);
+app.use("/api", auditRoutes);
 
 app.use(errorHandler);
 

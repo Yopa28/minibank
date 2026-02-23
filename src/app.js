@@ -22,12 +22,10 @@ app.use(rateLimit({ windowMs: 60000, max: 1000 }));
 // 
 app.use("/api/auth", authRoutes);
 
-// 
-app.use(authMiddleware);
-
-app.use("/api", accountRoutes);
-app.use("/api", transactionRoutes);
-app.use("/api", auditRoutes);
+// Protected API routes
+app.use("/api/accounts", authMiddleware, accountRoutes);
+app.use("/api/transactions", authMiddleware, transactionRoutes);
+app.use("/api/audit", authMiddleware, auditRoutes);
 
 app.use(errorHandler);
 

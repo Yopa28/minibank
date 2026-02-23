@@ -34,13 +34,35 @@ const api = axios.create({
     },
 });
 
-// Interceptor to add x-user-id header
+// Interceptor to add Authorization header
 api.interceptors.request.use((config) => {
-    // Prompt says: headers: { "x-user-id": localStorage.getItem("user") || "admin" }
-    const userId = localStorage.getItem('user') || 'admin';
-    config.headers['x-user-id'] = userId;
+    const token = localStorage.getItem('token');
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
 });
+
+// Interceptor to handle 401 errors
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
+
+export const authService = {
+    login: (credentials: { username: string; password: string }) =>
+        api.post<{ status: string; token: string }>('/auth/login', credentials),
+    register: (data: { username: string; password: string; role?: string }) =>
+        api.post('/auth/register', data),
+};
 
 export const accountService = {
     getAll: () => api.get<Account[]>('/accounts'),

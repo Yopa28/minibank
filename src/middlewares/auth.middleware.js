@@ -1,20 +1,36 @@
-function authMiddleware(req, res, next) {
-  const userId = req.headers["x-user-id"];
+const jwt = require("jsonwebtoken");
 
-  if (!userId) {
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
     return res.status(401).json({
       status: "error",
-      message: "Unauthorized: x-user-id header required"
+      message: "Unauthorized: Token required"
     });
   }
 
-  // Simulasi user login
-  req.user = {
-    id: userId,
-    role: userId === "admin" ? "admin" : "user"
-  };
+  const token = authHeader.split(" ")[1];
 
-  next();
+  if (!token) {
+    return res.status(401).json({
+      status: "error",
+      message: "Unauthorized: Invalid token format"
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = decoded; // { id, role }
+
+    next();
+  } catch (err) {
+    return res.status(401).json({
+      status: "error",
+      message: "Unauthorized: Invalid token"
+    });
+  }
 }
 
 module.exports = authMiddleware;

@@ -1,34 +1,51 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AuthContextType {
-    userId: string;
-    role: 'admin' | 'user';
-    login: (userId: string) => void;
+    user: { id: string; role: 'admin' | 'user' } | null;
+    token: string | null;
+    isAuthenticated: boolean;
+    login: (token: string) => void;
     logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [userId, setUserId] = useState<string>(localStorage.getItem('user') || 'admin');
-    const [role, setRole] = useState<'admin' | 'user'>(userId === 'admin' ? 'admin' : 'user');
+    const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+    const [user, setUser] = useState<AuthContextType['user']>(() => {
+        const savedToken = localStorage.getItem('token');
+        if (savedToken) {
+            try {
+                const payload = JSON.parse(atob(savedToken.split('.')[1]));
+                return { id: payload.id, role: payload.role };
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    });
 
-    useEffect(() => {
-        localStorage.setItem('user', userId);
-
-        setRole(userId === 'admin' ? 'admin' : 'user');
-    }, [userId]);
-
-    const login = (uid: string) => {
-        setUserId(uid);
+    const login = (newToken: string) => {
+        setToken(newToken);
+        localStorage.setItem('token', newToken);
+        try {
+            const payload = JSON.parse(atob(newToken.split('.')[1]));
+            setUser({ id: payload.id, role: payload.role });
+        } catch (e) {
+            setUser(null);
+        }
     };
 
     const logout = () => {
-        setUserId('user'); // Default back to user
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('token');
     };
 
+    const isAuthenticated = !!token;
+
     return (
-        <AuthContext.Provider value={{ userId, role, login, logout }}>
+        <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

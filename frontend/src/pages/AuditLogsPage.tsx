@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-    History,
     Search,
     Download,
     RefreshCw,
@@ -12,6 +11,8 @@ import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
 import { auditService, type AuditLog } from '../services/api';
 import type { Column } from '../components/DataTable';
+import { exportToCSV } from '../utils/csvUtils';
+import { NotificationToast } from '../components/NotificationToast';
 
 const AuditLogsPage: React.FC = () => {
     const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -19,6 +20,7 @@ const AuditLogsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [actionFilter, setActionFilter] = useState('all');
+    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     const fetchLogs = async () => {
         try {
@@ -29,6 +31,15 @@ const AuditLogsPage: React.FC = () => {
             console.error("Failed to fetch logs", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleExportCSV = () => {
+        try {
+            exportToCSV(filteredLogs, `audit_logs_export_${new Date().toISOString().split('T')[0]}`);
+            setNotification({ message: "CSV exported successfully", type: "success" });
+        } catch (error) {
+            setNotification({ message: "Failed to export CSV", type: "error" });
         }
     };
 
@@ -105,7 +116,10 @@ const AuditLogsPage: React.FC = () => {
                         <RefreshCw className={clsx("w-4 h-4 mr-2", loading && "animate-spin")} />
                         Refresh
                     </button>
-                    <button className="btn btn-secondary">
+                    <button
+                        onClick={handleExportCSV}
+                        className="btn btn-secondary"
+                    >
                         <Download className="w-4 h-4 mr-2" />
                         Export CSV
                     </button>
@@ -146,6 +160,14 @@ const AuditLogsPage: React.FC = () => {
                     emptyMessage="No audit logs found matching your criteria."
                 />
             </Card>
+
+            {notification && (
+                <NotificationToast
+                    message={notification.message}
+                    type={notification.type}
+                    onClose={() => setNotification(null)}
+                />
+            )}
         </div>
     );
 };

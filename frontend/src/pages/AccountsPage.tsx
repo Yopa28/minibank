@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
     Search,
     Filter,
-    MoreVertical,
     Eye,
     Snowflake,
     Sun,
-    UserPlus
+    UserPlus,
+    Download
 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
@@ -15,6 +15,8 @@ import { accountService, type Account } from '../services/api';
 import type { Column } from '../components/DataTable';
 import { useAuth } from '../context/AuthContext';
 import { NotificationToast } from '../components/NotificationToast';
+import CreateAccountModal from '../components/CreateAccountModal';
+import { exportToCSV } from '../utils/csvUtils';
 
 const AccountsPage: React.FC = () => {
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -22,8 +24,10 @@ const AccountsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-    const { role } = useAuth();
+    const { user } = useAuth();
+    const role = user?.role;
     const navigate = useNavigate();
 
     const fetchAccounts = async () => {
@@ -56,6 +60,15 @@ const AccountsPage: React.FC = () => {
             fetchAccounts();
         } catch (error) {
             setNotification({ message: "Action failed. Check your permissions.", type: "error" });
+        }
+    };
+
+    const handleExportCSV = () => {
+        try {
+            exportToCSV(filteredAccounts, `accounts_export_${new Date().toISOString().split('T')[0]}`);
+            setNotification({ message: "CSV exported successfully", type: "success" });
+        } catch (error) {
+            setNotification({ message: "Failed to export CSV", type: "error" });
         }
     };
 
@@ -140,10 +153,22 @@ const AccountsPage: React.FC = () => {
                     <h1 className="text-2xl font-bold text-slate-900">Accounts Management</h1>
                     <p className="text-slate-500">View and manage customer bank accounts.</p>
                 </div>
-                <button className="btn btn-primary">
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Create New Account
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleExportCSV}
+                        className="btn border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export CSV
+                    </button>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="btn btn-primary"
+                    >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Create New Account
+                    </button>
+                </div>
             </div>
 
             <Card>
@@ -187,6 +212,16 @@ const AccountsPage: React.FC = () => {
                     onClose={() => setNotification(null)}
                 />
             )}
+
+            <CreateAccountModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={() => {
+                    setNotification({ message: "Account created successfully", type: "success" });
+                    fetchAccounts();
+                }}
+                onCreate={(data) => accountService.create(data)}
+            />
         </div>
     );
 };

@@ -22,24 +22,20 @@ const TransferPage: React.FC = () => {
         amount: '',
     });
 
-    const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    const { } = useAuth(); // role/userId not used here as it's passed in headers
+    useAuth(); // role/userId not used here as it's passed in headers
 
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchAccounts = async () => {
             try {
-                setLoading(true);
                 const res = await accountService.getAll();
                 setAccounts(res.data);
             } catch (error) {
                 setNotification({ message: "Failed to load accounts", type: "error" });
-            } finally {
-                setLoading(false);
             }
         };
         fetchAccounts();

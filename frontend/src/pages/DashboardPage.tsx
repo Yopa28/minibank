@@ -4,8 +4,7 @@ import {
     DollarSign,
     Snowflake,
     Activity,
-    ArrowUpRight,
-    ArrowDownLeft
+    ArrowUpRight
 } from 'lucide-react';
 import { StatCard, Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';

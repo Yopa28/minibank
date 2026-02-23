@@ -22,7 +22,8 @@ import { NotificationToast } from '../components/NotificationToast';
 const AccountDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { role } = useAuth();
+    const { user } = useAuth();
+    const role = user?.role;
 
     const [account, setAccount] = useState<Account | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);

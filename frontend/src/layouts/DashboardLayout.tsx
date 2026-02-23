@@ -7,7 +7,6 @@ import {
     History,
     LogOut,
     Menu,
-    X,
     ShieldCheck,
     Search,
     Bell,
@@ -23,7 +22,9 @@ function cn(...inputs: ClassValue[]) {
 
 const DashboardLayout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { userId, role, logout } = useAuth();
+    const { user, logout } = useAuth();
+    const role = user?.role;
+    const userId = user?.id;
     const location = useLocation();
 
     const navigation = [

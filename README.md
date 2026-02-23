@@ -1,5 +1,7 @@
 # 🏦 Mini Bank: Fullstack Core Banking System
 
+//username : admin //password : admin123
+
 [![Test Status](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/Yopa28/minibank/actions)
 [![Coverage](https://img.shields.io/badge/coverage-57%25-orange)](https://github.com/Yopa28/minibank)
 [![React Version](https://img.shields.io/badge/react-v18-blue)](https://react.dev)

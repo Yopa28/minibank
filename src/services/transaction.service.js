@@ -149,17 +149,36 @@ async function transfer(fromId, toId, amount, performedBy) {
 
   return runInTransaction(async (conn) => {
 
-    // Lock sender
-    const [senderRows] = await conn.query(
+    // 🔒 Deadlock-safe locking order
+    const firstLockId = Math.min(fromId, toId);
+    const secondLockId = Math.max(fromId, toId);
+
+    // Lock smaller ID first
+    const [firstRows] = await conn.query(
       "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
-      [fromId]
+      [firstLockId]
     );
 
-    const sender = senderRows[0];
-
-    if (!sender) {
-      throw new AppError(404, "Sender account not found");
+    if (!firstRows[0]) {
+      throw new AppError(404, "Account not found");
     }
+
+    // Lock larger ID second
+    const [secondRows] = await conn.query(
+      "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
+      [secondLockId]
+    );
+
+    if (!secondRows[0]) {
+      throw new AppError(404, "Account not found");
+    }
+
+    // Sekarang ambil sender & receiver dari hasil lock
+    const sender =
+      fromId === firstLockId ? firstRows[0] : secondRows[0];
+
+    const receiver =
+      toId === secondLockId ? secondRows[0] : firstRows[0];
 
     if (sender.isFrozen) {
       throw new AppError(403, "Sender account is frozen");
@@ -167,18 +186,6 @@ async function transfer(fromId, toId, amount, performedBy) {
 
     if (Number(sender.balance) < Number(amount)) {
       throw new AppError(409, "Insufficient balance");
-    }
-
-    // Lock receiver
-    const [receiverRows] = await conn.query(
-      "SELECT * FROM accounts WHERE id = ? FOR UPDATE",
-      [toId]
-    );
-
-    const receiver = receiverRows[0];
-
-    if (!receiver) {
-      throw new AppError(404, "Receiver account not found");
     }
 
     // Update balances
